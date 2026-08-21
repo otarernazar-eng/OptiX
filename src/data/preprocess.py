@@ -25,7 +25,11 @@ class RetinopathyDataset(Dataset):
         
     def __getitem__(self, idx):
         row = self.df.iloc[idx]
-        img_path = row['path']
+        img_path = row.get('image_path', row.get('path'))
+        project_root = Path(__file__).resolve().parents[2]
+        if not Path(img_path).is_absolute():
+            img_path = str(project_root / img_path)
+
         label = self.class_to_idx[row['label']]
         
         image = cv2.imread(img_path)
@@ -76,30 +80,16 @@ def prepare_datasets(config):
     
     splits_dir.mkdir(parents=True, exist_ok=True)
     
-    meta_path = raw_dir / 'metadata.csv'
-    if not meta_path.exists():
-        raise FileNotFoundError(f"Metadata file not found at {meta_path}. Please run data loader first.")
+    train_path = splits_dir / 'train.csv'
+    val_path = splits_dir / 'val.csv'
+    test_path = splits_dir / 'test.csv'
+    
+    if not (train_path.exists() and val_path.exists() and test_path.exists()):
+        raise FileNotFoundError(f"Split CSVs not found in {splits_dir}. Please run scripts/merge_datasets.py first.")
         
-    df = pd.read_csv(meta_path)
-    
-    if len(df) < 10:
-        raise ValueError("Metadata contains too few or no images. Cannot perform splits.")
-        
-    # Split: Train (70%), Val (15%), Test (15%)
-    # First split: Train (70%) and Temp (30%)
-    train_df, temp_df = train_test_split(
-        df, test_size=0.30, stratify=df['label'], random_state=42
-    )
-    
-    # Second split: Val (15%) and Test (15%) - which is 50% of the Temp
-    val_df, test_df = train_test_split(
-        temp_df, test_size=0.50, stratify=temp_df['label'], random_state=42
-    )
-    
-    # Save splits
-    train_df.to_csv(splits_dir / 'train.csv', index=False)
-    val_df.to_csv(splits_dir / 'val.csv', index=False)
-    test_df.to_csv(splits_dir / 'test.csv', index=False)
+    train_df = pd.read_csv(train_path)
+    val_df = pd.read_csv(val_path)
+    test_df = pd.read_csv(test_path)
     
     # Generate EDA
     generate_eda_reports(train_df, val_df, test_df, reports_dir)
