@@ -1,0 +1,30 @@
+project: OptiX
+data:
+  raw_dir: data/raw
+  processed_dir: data/processed
+  splits_dir: data/splits
+model:
+  architecture: EfficientNet-B0
+  num_classes: 2
+  pretrained: true
+  freeze_backbone: false
+  drop_rate: 0.2
+  save_dir: models/
+training:
+  image_size: 384
+  batch_size: 16
+  num_workers: 4
+  use_weighted_sampler: true
+  learning_rate: 0.001
+  epochs: 2
+  loss_type: "focal" # options: ce, focal, weighted_ce
+  focal_gamma: 2.0
+  focal_alpha: 0.25
+  class_weights: [1.0, 3.0]
+  early_stopping_patience: 10
+  use_amp: true
+
+inference:
+  backend: pytorch # Варианты: pytorch, onnx
+  model_path: models/best.pth
+  grad_cam: true
