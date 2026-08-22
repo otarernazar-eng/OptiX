@@ -16,7 +16,7 @@ training:
   num_workers: 4
   use_weighted_sampler: true
   learning_rate: 0.001
-  epochs: 2
+  epochs: 50
   loss_type: "focal" # options: ce, focal, weighted_ce
   focal_gamma: 2.0
   focal_alpha: 0.25
