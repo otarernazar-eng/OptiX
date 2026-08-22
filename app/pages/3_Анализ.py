@@ -57,6 +57,10 @@ cam_method = st.sidebar.selectbox(
 )
 enable_cam = st.sidebar.checkbox("Включить тепловые карты", value=True)
 
+st.sidebar.divider()
+st.sidebar.write("### Безопасность")
+enable_ood = st.sidebar.checkbox("Включить OOD-фильтр (защита от не-медицинских фото)", value=True, help="Отключите, если настоящие снимки сетчатки ошибочно блокируются.")
+
 # Drag-and-drop область (с поддержкой Batch)
 uploaded_files = st.file_uploader(
     "Перетащите файлы сюда (Поддерживается несколько файлов)", 
@@ -71,17 +75,18 @@ def is_valid_retina(image: Image.Image) -> tuple[bool, str]:
     
     # 1. Цветовой профиль. Сетчатка всегда имеет доминирующий красный/оранжевый канал
     r, g, b = np.mean(img_np[:,:,0]), np.mean(img_np[:,:,1]), np.mean(img_np[:,:,2])
-    if r < g or r < b:
-        return False, "Неверный цветовой профиль. Отсутствует характерный красно-оранжевый оттенок."
-    if b > r * 0.7:
+    
+    # Очень мягкая проверка (чтобы не отбрасывать снимки с разных камер)
+    if b > r * 0.95:
         return False, "Слишком много синего спектра. (Возможно, это обычная фотография)."
         
     # 2. Плотность границ (Edge Density). На глазном дне только гладкие сосуды.
-    # Много резких границ (текст, пальцы, предметы) -> это не сетчатка
     gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
     edges = cv2.Canny(gray, 100, 200)
     edge_density = np.mean(edges) / 255.0
-    if edge_density > 0.08:
+    
+    # Увеличен порог до 0.20 для пропуска шумных медицинских снимков
+    if edge_density > 0.20:
         return False, "Обнаружено слишком много посторонних резких границ и структур."
         
     return True, "OK"
@@ -115,7 +120,11 @@ if uploaded_files:
             invalid_cases = []
             
             for img, fname in zip(images, filenames):
-                is_valid, reason = is_valid_retina(img)
+                if enable_ood:
+                    is_valid, reason = is_valid_retina(img)
+                else:
+                    is_valid, reason = True, "OK"
+                    
                 if is_valid:
                     valid_images.append(img)
                     valid_filenames.append(fname)
