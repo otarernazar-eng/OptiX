@@ -25,7 +25,7 @@ def get_albumentations_transforms(image_size):
         A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.5),
         A.CLAHE(clip_limit=2.0, tile_grid_size=(8, 8), p=0.3),
         A.GaussianBlur(blur_limit=(3, 7), p=0.3),
-        A.GaussianNoise(p=0.3),
+        A.GaussNoise(p=0.3),
         
         # Нормализация ImageNet и конвертация в Tensor
         A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
