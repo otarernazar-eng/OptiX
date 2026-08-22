@@ -12,7 +12,7 @@ st.set_page_config(page_title="О проекте", page_icon="ℹ️", layout="w
 apply_theme()
 
 st.title("ℹ️ О проекте OptiX Medical")
-st.image("https://images.unsplash.com/photo-1579684385127-1ef15d508118?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80", use_column_width=True)
+st.image("https://images.unsplash.com/photo-1579684385127-1ef15d508118?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80", use_container_width=True)
 
 st.header("🌍 Актуальность для Казахстана")
 st.write("""

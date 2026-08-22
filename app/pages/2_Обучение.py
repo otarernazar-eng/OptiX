@@ -9,7 +9,10 @@ import sys
 from pathlib import Path
 import traceback
 
-from streamlit.runtime.scriptrunner.script_run_context import add_script_run_ctx
+try:
+    from streamlit.runtime.scriptrunner import add_script_run_ctx
+except ImportError:
+    from streamlit.runtime.scriptrunner.script_run_context import add_script_run_ctx
 
 project_root = Path(__file__).resolve().parents[2]
 if str(project_root) not in sys.path:
