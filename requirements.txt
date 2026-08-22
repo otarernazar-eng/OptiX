@@ -17,3 +17,4 @@ timm
 onnxruntime
 grad-cam
 reportlab
+tensorboard

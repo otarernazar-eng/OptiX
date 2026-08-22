@@ -9,8 +9,8 @@ if str(project_root) not in sys.path:
     sys.path.append(str(project_root))
 
 from src.utils.config import load_config
-from src.data.loader import prepare_data
 from src.data.preprocess import prepare_datasets
+import subprocess
 
 st.set_page_config(page_title="Данные", page_icon="📂", layout="wide")
 
@@ -18,17 +18,20 @@ from app.utils_theme import apply_theme
 apply_theme()
 
 config = load_config()
-raw_dir = project_root / config['data'].get('raw_dir', 'data/raw')
-metadata_path = raw_dir / "metadata.csv"
+splits_dir = project_root / config['data'].get('splits_dir', 'data/splits')
+train_path = splits_dir / "train.csv"
 
 st.title("📂 Управление медицинскими данными")
 st.markdown("Подготовка наборов снимков (i-ROP, RIDIRP, Macretina) к обучению.")
 
 # Check status
-is_loaded = metadata_path.exists()
+is_loaded = train_path.exists()
 try:
     if is_loaded:
-        df = pd.read_csv(metadata_path)
+        df_train = pd.read_csv(train_path)
+        df_val = pd.read_csv(splits_dir / "val.csv")
+        df_test = pd.read_csv(splits_dir / "test.csv")
+        df = pd.concat([df_train, df_val, df_test])
         is_loaded = len(df) > 0
     else:
         df = None
@@ -67,10 +70,12 @@ if st.button("🔄 Подготовить / Обновить данные", type
         
     try:
         # Step 1: Loading
-        csv_path = prepare_data(config, progress_callback=ui_progress_callback)
+        status_text.text("Слияние и генерация данных (scripts/merge_datasets.py)...")
+        subprocess.run([sys.executable, "scripts/merge_datasets.py"], check=True)
+        progress_bar.progress(0.7)
         
         # Step 2: Preprocess, Splits, EDA
-        status_text.text("Разбиение датасета и генерация графиков (EDA)...")
+        status_text.text("Подготовка загрузчиков и графиков (EDA)...")
         progress_bar.progress(0.85)
         prepare_datasets(config)
         
@@ -95,9 +100,9 @@ if is_loaded:
     with col_a:
         if eda_path.exists():
             st.subheader("Разбиение классов")
-            st.image(str(eda_path), use_column_width=True)
+            st.image(str(eda_path), use_container_width=True)
             
     with col_b:
         if aug_path.exists():
             st.subheader("Примеры аугментаций")
-            st.image(str(aug_path), use_column_width=True)
+            st.image(str(aug_path), use_container_width=True)
