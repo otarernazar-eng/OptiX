@@ -121,6 +121,8 @@ if uploaded_files:
                 class_names = ["Norm (Низкий Риск)", "ROP (Высокий Риск)"]
                 predicted_name = class_names[pred_class]
                 
+                confidence = probs[pred_class] * 100
+                
                 st.session_state.history.append({
                     'timestamp': time.time(),
                     'filename': filenames[0],
@@ -129,7 +131,6 @@ if uploaded_files:
                     'image': images[0],
                     'cam': cam_img
                 })
-                confidence = probs[pred_class] * 100
                 
                 # Карточка результатов
                 st.subheader("Результат")
