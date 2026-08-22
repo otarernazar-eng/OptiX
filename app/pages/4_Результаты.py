@@ -33,10 +33,10 @@ else:
         with st.container():
             c1, c2, c3, c4, c5 = st.columns([1.5, 1.5, 2, 2, 1])
             with c1:
-                st.image(item['image'], use_column_width=True, caption="Оригинал")
+                st.image(item['image'], use_container_width=True, caption="Оригинал")
             with c2:
                 if item.get('cam') is not None:
-                    st.image(item['cam'], use_column_width=True, caption="Grad-CAM")
+                    st.image(item['cam'], use_container_width=True, caption="Grad-CAM")
                 else:
                     st.write("Тепловой карты нет")
             with c3:

@@ -56,7 +56,7 @@ st.divider()
 st.header("👥 Команда разработчиков")
 col1, col2, col3 = st.columns(3)
 with col1:
-    st.info("**[Имя Фамилия 1]**\n\n*ML Engineer & Team Lead*\n\nАрхитектура нейросетей, Computer Vision, пайплайны обучения.")
+    st.info("**Отар Ерназар**\n\n*ML Engineer & Team Lead*\n\nАрхитектура нейросетей, Computer Vision, пайплайны обучения.")
 with col2:
     st.info("**[Имя Фамилия 2]**\n\n*Data Scientist*\n\nАнализ медицинских датасетов, аугментации, оценка метрик (Clinical Utility).")
 with col3:

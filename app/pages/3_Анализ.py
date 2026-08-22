@@ -71,7 +71,7 @@ if uploaded_files:
     cols = st.columns(min(len(uploaded_files), 4))
     for i, file in enumerate(uploaded_files):
         img = Image.open(file).convert('RGB')
-        cols[i % 4].image(img, caption=file.name, use_column_width=True)
+        cols[i % 4].image(img, caption=file.name, use_container_width=True)
         
     st.divider()
     
@@ -147,10 +147,10 @@ if uploaded_files:
                 # Изображения рядом
                 img_col1, img_col2 = st.columns(2)
                 with img_col1:
-                    st.image(images[0], caption="Оригинал", use_column_width=True)
+                    st.image(images[0], caption="Оригинал", use_container_width=True)
                 with img_col2:
                     if cam_img is not None:
-                        st.image(cam_img, caption=f"Тепловая карта ({cam_method})", use_column_width=True)
+                        st.image(cam_img, caption=f"Тепловая карта ({cam_method})", use_container_width=True)
                     else:
                         st.info("Тепловая карта отключена в настройках.")
                         
@@ -226,6 +226,6 @@ if uploaded_files:
                                 st.write(f"**{filenames[idx]}** - {table_data[idx]['Статус']}")
                                 cam = results[idx].get('cam')
                                 if cam is not None:
-                                    st.image(cam, caption=f"Grad-CAM ({cam_method})", use_column_width=True)
+                                    st.image(cam, caption=f"Grad-CAM ({cam_method})", use_container_width=True)
                                 else:
-                                    st.image(images[idx], caption="Оригинал", use_column_width=True)
+                                    st.image(images[idx], caption="Оригинал", use_container_width=True)
