@@ -6,6 +6,7 @@ from PIL import Image
 import traceback
 import pandas as pd
 import numpy as np
+import cv2
 
 project_root = Path(__file__).resolve().parents[2]
 if str(project_root) not in sys.path:
@@ -64,6 +65,27 @@ uploaded_files = st.file_uploader(
     key=f"uploader_{st.session_state.clear_key}"
 )
 
+def is_valid_retina(image: Image.Image) -> tuple[bool, str]:
+    """Эвристическая проверка, является ли изображение снимком сетчатки глаза."""
+    img_np = np.array(image.convert('RGB'))
+    
+    # 1. Цветовой профиль. Сетчатка всегда имеет доминирующий красный/оранжевый канал
+    r, g, b = np.mean(img_np[:,:,0]), np.mean(img_np[:,:,1]), np.mean(img_np[:,:,2])
+    if r < g or r < b:
+        return False, "Неверный цветовой профиль. Отсутствует характерный красно-оранжевый оттенок."
+    if b > r * 0.7:
+        return False, "Слишком много синего спектра. (Возможно, это обычная фотография)."
+        
+    # 2. Плотность границ (Edge Density). На глазном дне только гладкие сосуды.
+    # Много резких границ (текст, пальцы, предметы) -> это не сетчатка
+    gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
+    edges = cv2.Canny(gray, 100, 200)
+    edge_density = np.mean(edges) / 255.0
+    if edge_density > 0.08:
+        return False, "Обнаружено слишком много посторонних резких границ и структур."
+        
+    return True, "OK"
+
 if uploaded_files:
     # 1. Предварительный просмотр
     st.subheader("Предварительный просмотр")
@@ -86,6 +108,30 @@ if uploaded_files:
         with st.spinner("Работа нейросети. Пожалуйста, подождите..."):
             images = [Image.open(f).convert('RGB') for f in uploaded_files]
             filenames = [f.name for f in uploaded_files]
+            
+            # Предварительная OOD (Out-of-Distribution) валидация
+            valid_images = []
+            valid_filenames = []
+            invalid_cases = []
+            
+            for img, fname in zip(images, filenames):
+                is_valid, reason = is_valid_retina(img)
+                if is_valid:
+                    valid_images.append(img)
+                    valid_filenames.append(fname)
+                else:
+                    invalid_cases.append((fname, reason))
+                    
+            if invalid_cases:
+                for fname, reason in invalid_cases:
+                    st.warning(f"⚠️ Изображение **{fname}** отклонено системой защиты.\n\n**Причина:** {reason}")
+                
+            if len(valid_images) == 0:
+                st.error("Все загруженные изображения отклонены как не относящиеся к медицинским снимкам сетчатки. Анализ остановлен.")
+                st.stop()
+                
+            images = valid_images
+            filenames = valid_filenames
             
             start_time = time.time()
             try:
