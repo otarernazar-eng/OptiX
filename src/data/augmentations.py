@@ -13,19 +13,19 @@ def get_albumentations_transforms(image_size):
     train_transform = A.Compose([
         # Поддержание пропорций (padding)
         A.LongestMaxSize(max_size=image_size),
-        A.PadIfNeeded(min_height=image_size, min_width=image_size, border_mode=cv2.BORDER_CONSTANT, value=0),
+        A.PadIfNeeded(min_height=image_size, min_width=image_size, border_mode=cv2.BORDER_CONSTANT, fill=0),
         
         # Пространственные трансформации
         A.Rotate(limit=30, p=0.7),
         A.HorizontalFlip(p=0.5),
         A.VerticalFlip(p=0.5),
-        A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.1, rotate_limit=0, p=0.5),
+        A.Affine(translate_percent=0.1, scale=(0.9, 1.1), rotate=0, p=0.5),
         
         # Цветовые и шумовые трансформации
         A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.5),
         A.CLAHE(clip_limit=2.0, tile_grid_size=(8, 8), p=0.3),
         A.GaussianBlur(blur_limit=(3, 7), p=0.3),
-        A.GaussNoise(var_limit=(10.0, 50.0), p=0.3),
+        A.GaussianNoise(p=0.3),
         
         # Нормализация ImageNet и конвертация в Tensor
         A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
@@ -35,7 +35,7 @@ def get_albumentations_transforms(image_size):
     val_transform = A.Compose([
         # Только resize с сохранением пропорций и нормализация
         A.LongestMaxSize(max_size=image_size),
-        A.PadIfNeeded(min_height=image_size, min_width=image_size, border_mode=cv2.BORDER_CONSTANT, value=0),
+        A.PadIfNeeded(min_height=image_size, min_width=image_size, border_mode=cv2.BORDER_CONSTANT, fill=0),
         A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
         ToTensorV2()
     ])
@@ -66,7 +66,12 @@ def visualize_augmentations(dataset, output_path="reports/aug_examples.png", num
     for i in range(num_samples):
         # Достаем путь к оригинальному изображению из метаданных
         row = dataset.df.iloc[i]
-        img_path = row['path']
+        img_path = row.get('image_path', row.get('path'))
+        
+        # Absolute path resolution
+        project_root = Path(__file__).resolve().parents[2]
+        if not Path(img_path).is_absolute():
+            img_path = str(project_root / img_path)
         
         # Загружаем оригинал (до аугментаций)
         orig_img = cv2.imread(img_path)
