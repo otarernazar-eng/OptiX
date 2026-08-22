@@ -23,19 +23,7 @@ def get_label(dataset, filepath):
         return 0
     return 0
 
-def mock_dataset_if_empty():
-    """Синтезируем метаданные, если данные еще не скачаны вручную."""
-    data = []
-    # RIDIRP: 6004 (assume 4000 normal, 2004 ROP)
-    for i in range(6004):
-        data.append({'image_path': f'data/raw/ridirp/img_{i}.jpg', 'label': 0 if i < 4000 else 1, 'dataset_source': 'RIDIRP'})
-    # Macretina: 1432 (Ridge 465 -> 1, OD/BV -> 0)
-    for i in range(1432):
-        data.append({'image_path': f'data/raw/macretina/img_{i}.jpg', 'label': 1 if i < 465 else 0, 'dataset_source': 'Macretina'})
-    # FARFUM: 1533 (assume 1000 normal, 533 plus)
-    for i in range(1533):
-        data.append({'image_path': f'data/raw/farfum/img_{i}.jpg', 'label': 0 if i < 1000 else 1, 'dataset_source': 'FARFUM'})
-    return pd.DataFrame(data)
+# Mock generation removed to prevent accidental fake training
 
 def main():
     splits_dir.mkdir(exist_ok=True, parents=True)
@@ -44,13 +32,17 @@ def main():
     data = []
     datasets = ['ridirp', 'macretina', 'farfum']
     
+    all_found_extensions = set()
+    
     # 1. Сканирование папок
     for ds in datasets:
         ds_path = raw_dir / ds
         if ds_path.exists():
             files = list(ds_path.rglob('*.*'))
             for filepath in files:
-                if filepath.suffix.lower() in ['.jpg', '.jpeg', '.png']:
+                ext = filepath.suffix.lower()
+                all_found_extensions.add(ext)
+                if ext in ['.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff', '.jfif']:
                     label = get_label(ds, filepath)
                     data.append({
                         'image_path': str(filepath.relative_to(project_root)).replace('\\', '/'),
@@ -62,8 +54,8 @@ def main():
         df = pd.DataFrame(data)
         print(f"Найдено реальных изображений: {len(df)}")
     else:
-        print("Реальные данные не найдены. Используется генерация Mock-метаданных для визуализации...")
-        df = mock_dataset_if_empty()
+        print(f"ОШИБКА: Реальные картинки не найдены! В папках лежат файлы со следующими расширениями: {all_found_extensions}")
+        raise ValueError("Реальные данные не найдены! Убедитесь, что архивы распаковались правильно и внутри есть картинки.")
         
     # 2. Визуализация распределения
     plt.figure(figsize=(10, 6))
