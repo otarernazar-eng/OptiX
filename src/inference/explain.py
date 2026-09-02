@@ -49,10 +49,9 @@ def generate_heatmap(model, input_tensor, orig_image, arch_name, method='GradCAM
     CamConstructor = cam_classes.get(method, GradCAM)
     
     device = next(model.parameters()).device
-    use_cuda = device.type == 'cuda'
     
     try:
-        with CamConstructor(model=model, target_layers=target_layer, use_cuda=use_cuda) as cam:
+        with CamConstructor(model=model, target_layers=target_layer) as cam:
             # Генерация маски (grayscale)
             grayscale_cam = cam(input_tensor=input_tensor, targets=None)[0]
             

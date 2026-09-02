@@ -16,9 +16,9 @@ from src.utils.config import load_config
 from src.inference.predictor import ROPredictor
 from src.utils.pdf_generator import generate_medical_report
 
-st.set_page_config(page_title="Анализ", page_icon="🔬", layout="wide")
+st.set_page_config(page_title="Анализ", layout="wide")
 
-st.title("🔬 Анализ снимка (Рабочее место врача)")
+st.title("Анализ снимка")
 st.write("Используйте Drag-and-drop для загрузки одного или нескольких снимков (пакетный режим).")
 
 from app.utils_theme import apply_theme
@@ -43,7 +43,6 @@ predictor = get_predictor()
 if predictor is None:
     st.stop()
 
-# Управление состоянием для очистки загрузчика
 if "clear_key" not in st.session_state:
     st.session_state.clear_key = 0
 
@@ -53,7 +52,7 @@ def clear_session():
 st.sidebar.write("### Настройки визуализации (XAI)")
 cam_method = st.sidebar.selectbox(
     "Алгоритм объяснимости", 
-    ["GradCAM", "GradCAM++", "ScoreCAM", "XGradCAM", "EigenCAM"]
+    ["EigenCAM", "GradCAM++", "ScoreCAM", "XGradCAM"]
 )
 enable_cam = st.sidebar.checkbox("Включить тепловые карты", value=True)
 
@@ -61,7 +60,6 @@ st.sidebar.divider()
 st.sidebar.write("### Безопасность")
 enable_ood = st.sidebar.checkbox("Включить OOD-фильтр (защита от не-медицинских фото)", value=True, help="Отключите, если настоящие снимки сетчатки ошибочно блокируются.")
 
-# Drag-and-drop область (с поддержкой Batch)
 uploaded_files = st.file_uploader(
     "Перетащите файлы сюда (Поддерживается несколько файлов)", 
     type=["jpg", "jpeg", "png"], 
@@ -70,31 +68,19 @@ uploaded_files = st.file_uploader(
 )
 
 def is_valid_retina(image: Image.Image) -> tuple[bool, str]:
-    """Эвристическая проверка, является ли изображение снимком сетчатки глаза."""
     img_np = np.array(image.convert('RGB'))
-    
-    # 1. Цветовой профиль. Сетчатка всегда имеет доминирующий красный/оранжевый канал
     r, g, b = np.mean(img_np[:,:,0]), np.mean(img_np[:,:,1]), np.mean(img_np[:,:,2])
-    
-    # Очень мягкая проверка (чтобы не отбрасывать снимки с разных камер)
     if b > r * 0.95:
         return False, "Слишком много синего спектра. (Возможно, это обычная фотография)."
-        
-    # 2. Плотность границ (Edge Density). На глазном дне только гладкие сосуды.
     gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
     edges = cv2.Canny(gray, 100, 200)
     edge_density = np.mean(edges) / 255.0
-    
-    # Увеличен порог до 0.20 для пропуска шумных медицинских снимков
     if edge_density > 0.20:
         return False, "Обнаружено слишком много посторонних резких границ и структур."
-        
     return True, "OK"
 
 if uploaded_files:
-    # 1. Предварительный просмотр
     st.subheader("Предварительный просмотр")
-    # Отображаем миниатюры в колонках (максимум 4 в ряд)
     cols = st.columns(min(len(uploaded_files), 4))
     for i, file in enumerate(uploaded_files):
         img = Image.open(file).convert('RGB')
@@ -102,19 +88,17 @@ if uploaded_files:
         
     st.divider()
     
-    # 2. Кнопки управления
     col_btn, col_clr, _ = st.columns([2, 1, 3])
     with col_btn:
-        analyze_btn = st.button("🚀 Проанализировать снимки", type="primary", use_container_width=True)
+        analyze_btn = st.button("Проанализировать снимки", type="primary", use_container_width=True)
     with col_clr:
-        st.button("🧹 Очистить", on_click=clear_session, use_container_width=True)
+        st.button("Очистить", on_click=clear_session, use_container_width=True)
         
     if analyze_btn:
         with st.spinner("Работа нейросети. Пожалуйста, подождите..."):
             images = [Image.open(f).convert('RGB') for f in uploaded_files]
             filenames = [f.name for f in uploaded_files]
             
-            # Предварительная OOD (Out-of-Distribution) валидация
             valid_images = []
             valid_filenames = []
             invalid_cases = []
@@ -133,7 +117,7 @@ if uploaded_files:
                     
             if invalid_cases:
                 for fname, reason in invalid_cases:
-                    st.warning(f"⚠️ Изображение **{fname}** отклонено системой защиты.\n\n**Причина:** {reason}")
+                    st.warning(f"Изображение {fname} отклонено системой защиты.\n\nПричина: {reason}")
                 
             if len(valid_images) == 0:
                 st.error("Все загруженные изображения отклонены как не относящиеся к медицинским снимкам сетчатки. Анализ остановлен.")
@@ -152,7 +136,6 @@ if uploaded_files:
             
             st.success(f"Анализ завершен! Затрачено времени: {end_time - start_time:.2f} сек.")
             
-            # Загрузка метаданных для PDF
             metrics_dict = {}
             metrics_path = project_root / 'reports' / 'comparison' / 'metrics_comparison.csv'
             if metrics_path.exists():
@@ -166,14 +149,13 @@ if uploaded_files:
             
             st.divider()
             
-            # --- ЛОГИКА ДЛЯ ОДНОГО ИЗОБРАЖЕНИЯ ---
             if len(images) == 1:
                 res = results[0]
                 pred_class = res['class']
                 probs = res['probs']
                 cam_img = res.get('cam')
                 
-                class_names = ["Norm (Низкий Риск)", "ROP (Высокий Риск)"]
+                class_names = ["Норма (Низкий Риск)", "ROP (Высокий Риск)"]
                 predicted_name = class_names[pred_class]
                 
                 confidence = probs[pred_class] * 100
@@ -187,20 +169,16 @@ if uploaded_files:
                     'cam': cam_img
                 })
                 
-                # Карточка результатов
                 st.subheader("Результат")
-                c1, c2, c3 = st.columns(3)
+                c1, c2 = st.columns(2)
                 with c1:
                     if pred_class == 1:
-                        st.error(f"**Диагноз:** {predicted_name} 🔴")
+                        st.error(f"Диагноз: {predicted_name}")
                     else:
-                        st.success(f"**Диагноз:** {predicted_name} 🟢")
+                        st.success(f"Диагноз: {predicted_name}")
                 with c2:
-                    st.metric("Уверенность сети", f"{confidence:.1f}%")
-                with c3:
                     st.metric("Время на фото", f"{end_time - start_time:.2f} с")
                     
-                # Изображения рядом
                 img_col1, img_col2 = st.columns(2)
                 with img_col1:
                     st.image(images[0], caption="Оригинал", use_container_width=True)
@@ -222,14 +200,13 @@ if uploaded_files:
                 )
                 
                 st.download_button(
-                    label="📥 Скачать медицинский отчет (PDF)",
+                    label="Скачать медицинский отчет (PDF)",
                     data=pdf_buffer,
                     file_name=f"OptiX_Report_{filenames[0]}.pdf",
                     mime="application/pdf",
                     type="primary"
                 )
                 
-            # --- ЛОГИКА ДЛЯ ПАКЕТА (НЕСКОЛЬКО ИЗОБРАЖЕНИЙ) ---
             else:
                 st.subheader(f"Пакетный анализ ({len(images)} снимков)")
                 table_data = []
@@ -243,8 +220,7 @@ if uploaded_files:
                     table_data.append({
                         "Файл": filenames[i],
                         "Диагноз": predicted_name,
-                        "Уверенность (%)": round(confidence, 1),
-                        "Статус": "🔴 Высокий риск" if pred_class == 1 else "🟢 Норма"
+                        "Статус": "Высокий риск" if pred_class == 1 else "Норма"
                     })
                     
                     st.session_state.history.append({
@@ -258,20 +234,17 @@ if uploaded_files:
                     
                 df_results = pd.DataFrame(table_data)
                 
-                # Таблица
                 st.dataframe(df_results, use_container_width=True)
                 
-                # Экспорт CSV
                 csv = df_results.to_csv(index=False).encode('utf-8')
                 st.download_button(
-                    label="📥 Скачать таблицу результатов (CSV)",
+                    label="Скачать таблицу результатов (CSV)",
                     data=csv,
                     file_name=f"OptiX_Batch_Results_{int(time.time())}.csv",
                     mime="text/csv",
                     type="primary"
                 )
                 
-                # Галерея визуализаций
                 st.subheader("Визуализации")
                 for i in range(0, len(results), 2):
                     c1, c2 = st.columns(2)
