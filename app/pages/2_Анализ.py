@@ -71,31 +71,14 @@ def is_medical_image(image: Image.Image) -> bool:
     
     img_np = np.array(image.convert('RGB'))
     
-    # 1. Спектральный анализ ИИ (доминирующий цвет)
+    # Спектральный анализ ИИ (доминирующий цвет)
     r_mean = np.mean(img_np[:, :, 0])
     g_mean = np.mean(img_np[:, :, 1])
     b_mean = np.mean(img_np[:, :, 2])
     
-    # У снимков сетчатки всегда красный спектр сильно доминирует над остальными
+    # У снимков сетчатки всегда красный спектр сильно доминирует над остальными.
+    # Делаем мягкую проверку: если синий или зеленый больше красного - бракуем.
     if r_mean < g_mean or r_mean < b_mean:
-        return False
-        
-    # 2. Анализ структурных паттернов (поиск круглого маскирования)
-    gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
-    _, thresh = cv2.threshold(gray, 10, 255, cv2.THRESH_BINARY)
-    
-    h, w = gray.shape
-    corners = [
-        thresh[0:h//10, 0:w//10],
-        thresh[0:h//10, -w//10:],
-        thresh[-h//10:, 0:w//10],
-        thresh[-h//10:, -w//10:]
-    ]
-    
-    bright_corners = sum(1 for corner in corners if np.mean(corner) > 100)
-    
-    # Если большинство углов светлые - это обычная фотография прямоугольного объекта
-    if bright_corners >= 3:
         return False
         
     return True
