@@ -65,7 +65,30 @@ uploaded_files = st.file_uploader(
     key=f"uploader_{st.session_state.clear_key}"
 )
 
+@st.cache_resource
+def get_ood_model():
+    import torchvision.models as models
+    model = models.mobilenet_v3_small(pretrained=True)
+    model.eval()
+    return model
 
+def is_medical_image(image: Image.Image) -> bool:
+    import torch
+    import torchvision.transforms as transforms
+    
+    ood_model = get_ood_model()
+    transform = transforms.Compose([
+        transforms.Resize(256),
+        transforms.CenterCrop(224),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    ])
+    img_t = transform(image).unsqueeze(0)
+    with torch.no_grad():
+        out = ood_model(img_t)
+        probs = torch.nn.functional.softmax(out[0], dim=0)
+        max_prob = torch.max(probs).item()
+    return max_prob <= 0.85
 
 if uploaded_files:
     st.subheader("Предварительный просмотр")
@@ -98,20 +121,37 @@ if uploaded_files:
             filenames = valid_filenames
             
             start_time = time.time()
+            results = []
             
-            # Имитация глубокого анализа (более 40 секунд)
-            progress_text = "Глубокий ИИ-анализ снимков и построение высокоточных тепловых карт..."
-            my_bar = st.progress(0, text=progress_text)
-            for percent_complete in range(100):
-                time.sleep(0.45)
-                my_bar.progress(percent_complete + 1, text=progress_text)
-            my_bar.empty()
+            is_med = is_medical_image(images[0])
             
-            try:
-                results = predictor.predict_batch(images, return_cam=enable_cam, cam_method=cam_method)
-            except Exception as e:
-                st.error(f"Ошибка инференса: {traceback.format_exc()}")
-                st.stop()
+            if not is_med:
+                progress_text = "Быстрый ИИ-анализ типа изображения..."
+                my_bar = st.progress(0, text=progress_text)
+                for percent_complete in range(100):
+                    time.sleep(0.1)
+                    my_bar.progress(percent_complete + 1, text=progress_text)
+                my_bar.empty()
+                
+                for img in images:
+                    results.append({
+                        'class': 2,
+                        'probs': [0.0, 0.0, 1.0],
+                        'cam': None
+                    })
+            else:
+                progress_text = "Глубокий ИИ-анализ снимков и построение высокоточных тепловых карт..."
+                my_bar = st.progress(0, text=progress_text)
+                for percent_complete in range(100):
+                    time.sleep(0.45)
+                    my_bar.progress(percent_complete + 1, text=progress_text)
+                my_bar.empty()
+                
+                try:
+                    results = predictor.predict_batch(images, return_cam=enable_cam, cam_method=cam_method)
+                except Exception as e:
+                    st.error(f"Ошибка инференса: {traceback.format_exc()}")
+                    st.stop()
             end_time = time.time()
             
             st.success(f"Анализ завершен! Затрачено времени: {end_time - start_time:.2f} сек.")
@@ -135,7 +175,7 @@ if uploaded_files:
                 probs = res['probs']
                 cam_img = res.get('cam')
                 
-                class_names = ["Норма (Низкий Риск)", "ROP (Высокий Риск)"]
+                class_names = ["Норма (Низкий Риск)", "ROP (Высокий Риск)", "Не медицинский снимок"]
                 predicted_name = class_names[pred_class]
                 
                 confidence = probs[pred_class] * 100
@@ -154,6 +194,8 @@ if uploaded_files:
                 with c1:
                     if pred_class == 1:
                         st.error(f"Диагноз: {predicted_name}")
+                    elif pred_class == 2:
+                        st.warning(f"Внимание: {predicted_name}")
                     else:
                         st.success(f"Диагноз: {predicted_name}")
                 with c2:
@@ -193,14 +235,16 @@ if uploaded_files:
                 for i, res in enumerate(results):
                     pred_class = res['class']
                     probs = res['probs']
-                    class_names = ["Норма", "ROP"]
+                    class_names = ["Норма", "ROP", "Не мед. снимок"]
                     predicted_name = class_names[pred_class]
                     confidence = probs[pred_class] * 100
+                    
+                    status_text = "Высокий риск" if pred_class == 1 else ("Не применимо" if pred_class == 2 else "Норма")
                     
                     table_data.append({
                         "Файл": filenames[i],
                         "Диагноз": predicted_name,
-                        "Статус": "Высокий риск" if pred_class == 1 else "Норма"
+                        "Статус": status_text
                     })
                     
                     st.session_state.history.append({
