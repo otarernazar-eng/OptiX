@@ -72,6 +72,7 @@ def is_medical_image(image: Image.Image) -> bool:
     try:
         from google import genai
     except ImportError:
+        st.warning("Библиотека google-genai не установлена!")
         return True
         
     # Получаем ключ из Streamlit Secrets или переменных окружения
@@ -81,12 +82,12 @@ def is_medical_image(image: Image.Image) -> bool:
         api_key = os.environ.get("GEMINI_API_KEY", "")
         
     if not api_key:
-        # Если ключа нет, по умолчанию считаем снимок валидным
+        st.warning("⚠️ Ключ GEMINI_API_KEY не найден в секретах Streamlit. Фильтр отключен.")
         return True
         
     try:
         client = genai.Client(api_key=api_key)
-        prompt = "Ты ИИ-фильтр для медицинского приложения. Это фотография глазного дна (сетчатки)? Ответь только одним словом: ДА или НЕТ."
+        prompt = "Ты строгий ИИ-фильтр для медицинского приложения. Это фотография глазного дна (сетчатки глаза)? Ответь строго одним словом: ДА или НЕТ."
         
         response = client.models.generate_content(
             model='gemini-2.5-flash',
@@ -100,7 +101,7 @@ def is_medical_image(image: Image.Image) -> bool:
             
         return True
     except Exception as e:
-        # При любых ошибках сети или лимитов пропускаем фото дальше
+        st.error(f"⚠️ Ошибка Gemini API: {e}")
         return True
 
 if uploaded_files:
