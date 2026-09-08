@@ -90,7 +90,7 @@ def is_medical_image(image: Image.Image) -> bool:
         prompt = "Ты строгий ИИ-фильтр для медицинского приложения. Это фотография глазного дна (сетчатки глаза)? Ответь строго одним словом: ДА или НЕТ."
         
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-3.6-flash',
             contents=[image, prompt],
         )
         answer = response.text.strip().upper()
