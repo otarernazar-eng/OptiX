@@ -210,7 +210,12 @@ if uploaded_files:
                     else:
                         st.info("Тепловая карта отключена в настройках.")
                         
-                recommendation = "Требуется срочный офтальмологический осмотр (подозрение на ROP)." if pred_class == 1 else "Плановый осмотр. Низкий риск."
+                if pred_class == 1:
+                    recommendation = "Требуется срочный офтальмологический осмотр (подозрение на ROP)."
+                elif pred_class == 2:
+                    recommendation = "Загружено немедицинское фото. Невозможно поставить диагноз."
+                else:
+                    recommendation = "Плановый осмотр. Низкий риск."
                 
                 pdf_buffer = generate_medical_report(
                     orig_image=np.array(images[0]),
