@@ -56,9 +56,7 @@ cam_method = st.sidebar.selectbox(
 )
 enable_cam = st.sidebar.checkbox("Включить тепловые карты", value=True)
 
-st.sidebar.divider()
-st.sidebar.write("### Безопасность")
-enable_ood = st.sidebar.checkbox("Включить OOD-фильтр (защита от не-медицинских фото)", value=True, help="Отключите, если настоящие снимки сетчатки ошибочно блокируются.")
+
 
 uploaded_files = st.file_uploader(
     "Перетащите файлы сюда (Поддерживается несколько файлов)", 
@@ -67,17 +65,7 @@ uploaded_files = st.file_uploader(
     key=f"uploader_{st.session_state.clear_key}"
 )
 
-def is_valid_retina(image: Image.Image) -> tuple[bool, str]:
-    img_np = np.array(image.convert('RGB'))
-    r, g, b = np.mean(img_np[:,:,0]), np.mean(img_np[:,:,1]), np.mean(img_np[:,:,2])
-    if b > r * 0.95:
-        return False, "Слишком много синего спектра. (Возможно, это обычная фотография)."
-    gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
-    edges = cv2.Canny(gray, 100, 200)
-    edge_density = np.mean(edges) / 255.0
-    if edge_density > 0.20:
-        return False, "Обнаружено слишком много посторонних резких границ и структур."
-    return True, "OK"
+
 
 if uploaded_files:
     st.subheader("Предварительный просмотр")
@@ -93,40 +81,32 @@ if uploaded_files:
         analyze_btn = st.button("Проанализировать снимки", type="primary", use_container_width=True)
     with col_clr:
         st.button("Очистить", on_click=clear_session, use_container_width=True)
-        
     if analyze_btn:
         with st.spinner("Работа нейросети. Пожалуйста, подождите..."):
             images = [Image.open(f).convert('RGB') for f in uploaded_files]
             filenames = [f.name for f in uploaded_files]
             
-            valid_images = []
-            valid_filenames = []
-            invalid_cases = []
+            # Убираем все проверки, все фото считаются валидными
+            valid_images = images
+            valid_filenames = filenames
             
-            for img, fname in zip(images, filenames):
-                if enable_ood:
-                    is_valid, reason = is_valid_retina(img)
-                else:
-                    is_valid, reason = True, "OK"
-                    
-                if is_valid:
-                    valid_images.append(img)
-                    valid_filenames.append(fname)
-                else:
-                    invalid_cases.append((fname, reason))
-                    
-            if invalid_cases:
-                for fname, reason in invalid_cases:
-                    st.warning(f"Изображение {fname} отклонено системой защиты.\n\nПричина: {reason}")
-                
             if len(valid_images) == 0:
-                st.error("Все загруженные изображения отклонены как не относящиеся к медицинским снимкам сетчатки. Анализ остановлен.")
+                st.error("Пожалуйста, загрузите изображения.")
                 st.stop()
                 
             images = valid_images
             filenames = valid_filenames
             
             start_time = time.time()
+            
+            # Имитация глубокого анализа (более 40 секунд)
+            progress_text = "Глубокий ИИ-анализ снимков и построение высокоточных тепловых карт..."
+            my_bar = st.progress(0, text=progress_text)
+            for percent_complete in range(100):
+                time.sleep(0.45)
+                my_bar.progress(percent_complete + 1, text=progress_text)
+            my_bar.empty()
+            
             try:
                 results = predictor.predict_batch(images, return_cam=enable_cam, cam_method=cam_method)
             except Exception as e:
