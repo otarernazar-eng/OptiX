@@ -66,22 +66,42 @@ uploaded_files = st.file_uploader(
 )
 
 def is_medical_image(image: Image.Image) -> bool:
-    import numpy as np
-    import cv2
+    import os
+    import streamlit as st
     
-    img_np = np.array(image.convert('RGB'))
-    
-    # Спектральный анализ ИИ (доминирующий цвет)
-    r_mean = np.mean(img_np[:, :, 0])
-    g_mean = np.mean(img_np[:, :, 1])
-    b_mean = np.mean(img_np[:, :, 2])
-    
-    # У снимков сетчатки всегда красный спектр сильно доминирует над остальными.
-    # Делаем мягкую проверку: если синий или зеленый больше красного - бракуем.
-    if r_mean < g_mean or r_mean < b_mean:
-        return False
+    try:
+        from google import genai
+    except ImportError:
+        return True
         
-    return True
+    # Получаем ключ из Streamlit Secrets или переменных окружения
+    try:
+        api_key = st.secrets["GEMINI_API_KEY"]
+    except Exception:
+        api_key = os.environ.get("GEMINI_API_KEY", "")
+        
+    if not api_key:
+        # Если ключа нет, по умолчанию считаем снимок валидным
+        return True
+        
+    try:
+        client = genai.Client(api_key=api_key)
+        prompt = "Ты ИИ-фильтр для медицинского приложения. Это фотография глазного дна (сетчатки)? Ответь только одним словом: ДА или НЕТ."
+        
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=[image, prompt],
+        )
+        answer = response.text.strip().upper()
+        
+        # Если ИИ явно говорит НЕТ
+        if "НЕТ" in answer and "ДА" not in answer:
+            return False
+            
+        return True
+    except Exception as e:
+        # При любых ошибках сети или лимитов пропускаем фото дальше
+        return True
 
 if uploaded_files:
     st.subheader("Предварительный просмотр")
