@@ -65,30 +65,40 @@ uploaded_files = st.file_uploader(
     key=f"uploader_{st.session_state.clear_key}"
 )
 
-@st.cache_resource
-def get_ood_model():
-    import torchvision.models as models
-    model = models.mobilenet_v3_small(pretrained=True)
-    model.eval()
-    return model
-
 def is_medical_image(image: Image.Image) -> bool:
-    import torch
-    import torchvision.transforms as transforms
+    import numpy as np
+    import cv2
     
-    ood_model = get_ood_model()
-    transform = transforms.Compose([
-        transforms.Resize(256),
-        transforms.CenterCrop(224),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-    ])
-    img_t = transform(image).unsqueeze(0)
-    with torch.no_grad():
-        out = ood_model(img_t)
-        probs = torch.nn.functional.softmax(out[0], dim=0)
-        max_prob = torch.max(probs).item()
-    return max_prob <= 0.85
+    img_np = np.array(image.convert('RGB'))
+    
+    # 1. Спектральный анализ ИИ (доминирующий цвет)
+    r_mean = np.mean(img_np[:, :, 0])
+    g_mean = np.mean(img_np[:, :, 1])
+    b_mean = np.mean(img_np[:, :, 2])
+    
+    # У снимков сетчатки всегда красный спектр сильно доминирует над остальными
+    if r_mean < g_mean or r_mean < b_mean:
+        return False
+        
+    # 2. Анализ структурных паттернов (поиск круглого маскирования)
+    gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
+    _, thresh = cv2.threshold(gray, 10, 255, cv2.THRESH_BINARY)
+    
+    h, w = gray.shape
+    corners = [
+        thresh[0:h//10, 0:w//10],
+        thresh[0:h//10, -w//10:],
+        thresh[-h//10:, 0:w//10],
+        thresh[-h//10:, -w//10:]
+    ]
+    
+    bright_corners = sum(1 for corner in corners if np.mean(corner) > 100)
+    
+    # Если большинство углов светлые - это обычная фотография прямоугольного объекта
+    if bright_corners >= 3:
+        return False
+        
+    return True
 
 if uploaded_files:
     st.subheader("Предварительный просмотр")
